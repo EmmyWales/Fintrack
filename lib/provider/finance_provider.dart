@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'dart:core';
 import 'package:fintrack/models/finance_transactions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 
 class FinanceProvider extends ChangeNotifier {
   static const String _storageKey = 'fintrack_transactions';
@@ -11,7 +11,7 @@ class FinanceProvider extends ChangeNotifier {
   bool _isLoading = true;
 
   List<FinanceTransaction> get transactions {
-    final result = [...transactions];
+    final result = List<FinanceTransaction>.from(_transactions);
     result.sort((a, b) => b.date.compareTo(a.date));
     return result;
   }
@@ -46,22 +46,50 @@ class FinanceProvider extends ChangeNotifier {
           );
         }).toList();
       } else {
+        // Demo data is used only on the first launch.
         _transactions = _sampleTransactions();
         await _saveTransactions();
       }
-    } catch (e) {
-      debugPrint('Could not load transaction: $e');
-      _transactions = _sampleTransactions();
+    } catch (error) {
+      debugPrint('Could not load transactions: $error');
+      _transactions = [];
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> addTransaction(FinanceTransaction transaction) async {
+  Future<void> addTransaction(
+    FinanceTransaction transaction,
+  ) async {
     _transactions.add(transaction);
     notifyListeners();
+    await _saveTransactions();
+  }
 
+  Future<void> editTransaction(
+    FinanceTransaction updatedTransaction,
+  ) async {
+    final index = _transactions.indexWhere(
+      (item) => item.id == updatedTransaction.id,
+    );
+
+    if (index == -1) return;
+
+    _transactions[index] = updatedTransaction;
+    notifyListeners();
+    await _saveTransactions();
+  }
+
+  Future<void> deleteTransaction(String id) async {
+    _transactions.removeWhere((item) => item.id == id);
+    notifyListeners();
+    await _saveTransactions();
+  }
+
+  Future<void> clearAllTransactions() async {
+    _transactions.clear();
+    notifyListeners();
     await _saveTransactions();
   }
 
@@ -69,7 +97,7 @@ class FinanceProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
 
     final encoded = jsonEncode(
-      _transactions.map((transaction) => transaction.toJson()).toList(),
+      _transactions.map((item) => item.toJson()).toList(),
     );
 
     await prefs.setString(_storageKey, encoded);
@@ -80,7 +108,7 @@ class FinanceProvider extends ChangeNotifier {
 
     return [
       FinanceTransaction(
-        id: '1',
+        id: 'demo-1',
         title: 'Monthly salary',
         category: 'Salary',
         amount: 2400,
@@ -88,7 +116,7 @@ class FinanceProvider extends ChangeNotifier {
         date: now,
       ),
       FinanceTransaction(
-        id: '2',
+        id: 'demo-2',
         title: 'Groceries',
         category: 'Food',
         amount: 54.80,
@@ -96,7 +124,7 @@ class FinanceProvider extends ChangeNotifier {
         date: now.subtract(const Duration(days: 1)),
       ),
       FinanceTransaction(
-        id: '3',
+        id: 'demo-3',
         title: 'Transport',
         category: 'Travel',
         amount: 18.50,
@@ -104,7 +132,7 @@ class FinanceProvider extends ChangeNotifier {
         date: now.subtract(const Duration(days: 2)),
       ),
       FinanceTransaction(
-        id: '4',
+        id: 'demo-4',
         title: 'Freelance work',
         category: 'Extra income',
         amount: 150,
